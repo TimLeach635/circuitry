@@ -1,14 +1,15 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+mod device;
+mod controller;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::controller::Controller;
+    use crate::device::memory::Memory;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn can_add_device_to_controller() {
+        let mut controller = Controller::new();
+        let device = Memory::new();
+        controller.add_device(0, Box::new(device));
     }
 }
