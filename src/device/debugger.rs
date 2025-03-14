@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::device::{Device, DeviceError, PortIdentifier, PortValue};
+use crate::device::{Device, DeviceError, OutputPortState, PortIdentifier, PortValue};
 
 pub struct Debugger {
     output_port: PortIdentifier,
@@ -32,6 +32,15 @@ impl Device for Debugger {
     fn get_output_ports(&self) -> HashSet<PortIdentifier> {
         let mut result = HashSet::new();
         result.insert(self.output_port.to_owned());
+        result
+    }
+
+    fn get_output_port_values(&self) -> HashMap<PortIdentifier, OutputPortState> {
+        let mut result = HashMap::new();
+        result.insert(
+            self.output_port.to_owned(),
+            OutputPortState::Known(self.values[self.current_value_idx])
+        );
         result
     }
 

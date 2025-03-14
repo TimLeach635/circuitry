@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::device::{Device, DeviceError, PortIdentifier, PortValue};
+use crate::device::{Device, DeviceError, OutputPortState, PortIdentifier, PortValue};
 
 pub struct Memory {
     data: HashMap<u32, u32>,
@@ -42,7 +42,25 @@ impl Device for Memory {
     fn get_output_ports(&self) -> HashSet<PortIdentifier> {
         self.out_ports.to_owned()
     }
-    
+
+    fn get_output_port_values(&self) -> HashMap<PortIdentifier, OutputPortState> {
+        let mut result: HashMap<PortIdentifier, OutputPortState> = HashMap::new();
+        result.insert(
+            "rv".to_owned(),
+            match self.specified_this_tick.get("ra") {
+                None => {
+                    let mut required = HashSet::new();
+                    required.insert("rv".to_owned());
+                    OutputPortState::Unknown(required)
+                }
+                Some(address) => OutputPortState::Known(
+                    *self.data.get(&address).unwrap_or(&0)
+                )
+            }
+        );
+        result
+    }
+
     fn provide_port_values(&mut self, values: HashMap<PortIdentifier, PortValue>)
         -> Result<HashMap<PortIdentifier, PortValue>, DeviceError> {
         // Check for problems

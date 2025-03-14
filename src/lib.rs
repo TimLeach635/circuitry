@@ -10,6 +10,6 @@ mod tests {
     fn can_add_device_to_controller() {
         let mut controller = Controller::new();
         let device = Memory::new();
-        controller.add_device(0, Box::new(device));
+        controller.add_device("mem1".to_owned(), Box::new(device));
     }
 }
