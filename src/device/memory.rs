@@ -42,9 +42,16 @@ impl Device for Memory {
     fn get_output_ports(&self) -> HashSet<PortIdentifier> {
         self.out_ports.to_owned()
     }
-    
+
+    fn get_output_dependencies(&self, output: &PortIdentifier) -> Result<HashSet<PortIdentifier>, DeviceError> {
+        if output.as_str() != "rv" {
+            return Err(DeviceError);
+        }
+        Ok(HashSet::from_iter(vec!["ra".to_owned()]))
+    }
+
     fn provide_port_values(&mut self, values: HashMap<PortIdentifier, PortValue>)
-        -> Result<HashMap<PortIdentifier, PortValue>, DeviceError> {
+        -> Result<(), DeviceError> {
         // Check for problems
         for port in values.keys() {
             if self.specified_this_tick.contains_key(port)
@@ -70,10 +77,21 @@ impl Device for Memory {
                 _ => {}
             }
         }
-        Ok(result)
+        Ok(())
     }
 
-    fn tick(&mut self) -> Result<HashMap<PortIdentifier, PortValue>, DeviceError> {
+    fn get_port_value(&self, port: &PortIdentifier) -> Result<Option<PortValue>, DeviceError> {
+        if port.as_str() != "rv" {
+            return Err(DeviceError);
+        }
+        
+        Ok(match self.specified_this_tick.get("ra") {
+            None => None,
+            Some(addr) => Some(*self.data.get(addr).unwrap_or(&0u32)),
+        })
+    }
+
+    fn tick(&mut self) -> Result<(), DeviceError> {
         if !self.specified_this_tick.contains_key("we") {
             // Need to know if we are writing to memory this tick         
             return Err(DeviceError);
@@ -92,7 +110,7 @@ impl Device for Memory {
         
         // Only output port is "rv", and it's not known at the beginning of a tick, so the return
         // is always empty
-        Ok(HashMap::new())
+        Ok(())
     }
 }
 
@@ -191,11 +209,12 @@ mod tests {
         memory.data.insert(address, value);
         let mut ports: HashMap<PortIdentifier, PortValue> = HashMap::new();
         ports.insert("ra".to_owned(), address);
-
-        let result = memory.provide_port_values(ports);
+    
+        memory.provide_port_values(ports).unwrap();
+        let result = memory.get_port_value(&"rv".to_owned());
         assert!(result.is_ok());
         let result = result.unwrap();
-        assert!(result.contains_key("rv"));
-        assert_eq!(result.get("rv").unwrap(), &value);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), value);
     }
 }
