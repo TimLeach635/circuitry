@@ -49,6 +49,16 @@ pub trait Device {
     /// guaranteed to be known.
     fn get_output_dependencies(&self, output: &PortIdentifier)
         -> Result<HashSet<PortIdentifier>, DeviceError>;
+
+    /// Provide a single value for an input port to this device.
+    ///
+    /// Should fail in the following circumstances:
+    /// * A value is provided for a port whose value has already been provided
+    /// * A value is provided for an output port (only input ports have values provided from
+    ///   outside)
+    /// * A value is provided for an unknown port
+    fn provide_port_value(&mut self, port: PortIdentifier, value: PortValue)
+        -> Result<(), DeviceError>;
     
     /// Provide a set of values for input ports to this device.
     /// 

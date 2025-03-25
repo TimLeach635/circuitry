@@ -50,6 +50,14 @@ impl Device for Memory {
         Ok(HashSet::from_iter(vec!["ra".to_owned()]))
     }
 
+    fn provide_port_value(&mut self, port: PortIdentifier, value: PortValue)
+        -> Result<(), DeviceError>
+    {
+        let mut values = HashMap::new();
+        values.insert(port, value);
+        self.provide_port_values(values)
+    }
+
     fn provide_port_values(&mut self, values: HashMap<PortIdentifier, PortValue>)
         -> Result<(), DeviceError> {
         // Check for problems

@@ -1,7 +1,8 @@
 use std::collections::HashMap;
-use crate::device::{Device, PortIdentifier};
+use crate::device::{Device, PortIdentifier, PortValue};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::acyclic::{Acyclic};
+use petgraph::Direction;
 
 pub type DeviceIdentifier = String;
 
@@ -107,6 +108,100 @@ impl Controller {
         self.dependencies = acyclic.into_inner();
 
         Ok(())
+    }
+
+    /// Perform a tick.
+    ///
+    /// This uses the dependency graph to figure out the value of every single port and connection
+    /// in the circuit (returning the values of all ports as a [`HashSet`]).
+    pub fn tick(&mut self)
+        -> Result<HashMap<(DeviceIdentifier, PortIdentifier), PortValue>, ControllerError>
+    {
+        // Here is where the acyclic data structure comes into its own - we can perform a
+        // "topological sort" of the nodes, which will tell us what order to traverse them in
+        // TODO: improve the memory usage of this, I don't like the clone
+        let acyclic = Acyclic::try_from_graph(self.dependencies.clone())
+            .expect("`self.dependencies` should never contain cycles, so should always be \
+            wrappable in the `Acyclic` wrapper");
+        let mut result: HashMap<(DeviceIdentifier, PortIdentifier), PortValue> = HashMap::new();
+        for port_idx in acyclic.nodes_iter() {
+            let (device_id, port_id) = acyclic.node_weight(port_idx)
+                .expect("Node index retrieved from `nodes_iter()` should return `Some` \
+                from `node_weight()`");
+
+            let device = self.devices.get(device_id)
+                .expect("Device id retrieved from `node_weight()` should always be a key \
+                present in `self.devices`");
+            if device.get_output_ports().contains(port_id) {
+                // This is an output port, so we should have provided its dependencies in a
+                // previous iteration, or it has no dependencies
+                result.insert(
+                    (device_id.clone(), port_id.clone()),
+                    device.get_port_value(port_id)
+                        .expect("Port value retrieved from `get_output_ports()` should always \
+                            be a valid input to `get_port_value()`")
+                        .expect("Output port should have a known value at this point in the \
+                            topological sort")
+                );
+            } else if device.get_input_ports().contains(port_id) {
+                // This is an input port, so its value must be coming from a connected output port.
+                // For now (and this will be changed), all input ports must have a value connected
+                // to them, so if we don't find a connection between this and an output port, that
+                // is an error.
+                // Thanks to the `neighbors_directed()` function, we can just directly find the
+                // connected output port, as it will be at the other end of the only incoming
+                // edge to this input port.
+                let mut incoming_neighbours = acyclic.neighbors_directed(
+                    port_idx,
+                    Direction::Incoming
+                );
+                let n_incoming = incoming_neighbours.clone().count();
+                let output_port_idx = match n_incoming {
+                    0 => return Err(ControllerError),  // No incoming value, cannot resolve
+                    1 => incoming_neighbours.next().expect("Length is 1, so `next()` should \
+                        return a value"),
+                    _ => panic!("Should not end up in a state where an input port can have more \
+                        than one incoming connection"),
+                };
+
+                // Get the value of that other port
+                let (output_device_id, output_port_id) = acyclic
+                    .node_weight(output_port_idx)
+                    .expect("Node index retrieved from `neighbors_directed()` should return \
+                    `Some` from `node_weight()`");
+                let output_device = self.devices.get(output_device_id)
+                    .expect("Device id retrieved from `node_weight()` should always be a key \
+                    present in `self.devices`");
+                let value = output_device.get_port_value(output_port_id)
+                    .expect("Port connected to an input port should be an output port, and \
+                        should be present on the device arrived at at this point")
+                    .expect("Output port should have a known value at this point in the \
+                            topological sort");
+
+                // Pass it to this device
+                // Need to re-borrow it as mutable
+                let device = self.devices.get_mut(device_id)
+                    .expect("Using same device id as before should retrieve value");
+                device.provide_port_value(port_id.clone(), value).expect("Port id and value \
+                    obtained at this point should be valid inputs to `provide_port_value()`");
+
+                // Store this value
+                result.insert((device_id.clone(), port_id.clone()), value);
+            }
+        }
+
+        // TODO: Ensure that if a failure occurs in one of the loops, we rollback the provision of
+        //  values to the other devices so a tick can be attempted again
+
+        // Now that we have retrieved all the values, we should perform a tick on every device
+        for device in self.devices.values_mut() {
+            if device.tick().is_err() {
+                // TODO: Rollback ticks so this can be done again
+                return Err(ControllerError);
+            }
+        }
+
+        Ok(result)
     }
 }
 
