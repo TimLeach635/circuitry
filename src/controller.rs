@@ -208,7 +208,7 @@ impl Controller {
 #[cfg(test)]
 mod tests {
     use crate::controller::Controller;
-    use crate::device::debugger::Debugger;
+    use crate::device::debug::sequencer::Sequencer;
     use crate::device::memory::Memory;
 
     #[test]
@@ -220,7 +220,7 @@ mod tests {
     fn controller_can_have_devices_added_to_it() {
         let mut controller = Controller::new();
         let memory = Memory::new();
-        let debugger = Debugger::new("qq".to_owned(), &vec![0]).unwrap();
+        let debugger = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
         
         let _ = controller.add_device("Memory".to_owned(), Box::new(memory));
         let _ = controller.add_device("Debugger".to_owned(), Box::new(debugger));
@@ -230,7 +230,7 @@ mod tests {
     fn controller_can_have_connections_added_to_it() {
         let mut controller = Controller::new();
         let memory = Memory::new();
-        let debugger = Debugger::new("qq".to_owned(), &vec![0]).unwrap();
+        let debugger = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
 
         let _ = controller.add_device("Memory".to_owned(), Box::new(memory));
         let _ = controller.add_device("Debugger".to_owned(), Box::new(debugger));

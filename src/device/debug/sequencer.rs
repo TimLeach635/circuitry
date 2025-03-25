@@ -1,20 +1,20 @@
 use std::collections::{HashMap, HashSet};
 use crate::device::{Device, DeviceError, PortIdentifier, PortValue};
 
-pub struct Debugger {
+pub struct Sequencer {
     output_port: PortIdentifier,
     values: Vec<PortValue>,
     current_value_idx: usize,
 }
 
-impl Debugger {
+impl Sequencer {
     pub fn new(
         output_port: PortIdentifier,
         values: &[PortValue],
-    ) -> Result<Debugger, ()> {
+    ) -> Result<Sequencer, ()> {
         match values.is_empty() {
             true => Err(()),
-            false => Ok(Debugger {
+            false => Ok(Sequencer {
                 output_port,
                 values: values.to_owned(),
                 current_value_idx: 0,
@@ -23,7 +23,7 @@ impl Debugger {
     }
 }
 
-impl Device for Debugger {
+impl Device for Sequencer {
     fn get_input_ports(&self) -> HashSet<PortIdentifier> {
         // No input ports
         HashSet::new()
@@ -74,18 +74,18 @@ impl Device for Debugger {
 
 #[cfg(test)]
 mod tests {
-    use crate::device::debugger::Debugger;
+    use crate::device::debug::sequencer::Sequencer;
     use crate::device::{Device, PortIdentifier, PortValue};
 
     #[test]
     fn debugger_cannot_be_instantiated_if_no_values_given() {
-        let result = Debugger::new("qq".to_owned(), &vec![]);
+        let result = Sequencer::new("qq".to_owned(), &vec![]);
         assert!(result.is_err());
     }
     
     #[test]
     fn debugger_can_be_instantiated() {
-        let result = Debugger::new("qq".to_owned(), &vec![0]);
+        let result = Sequencer::new("qq".to_owned(), &vec![0]);
         assert!(result.is_ok());
     }
     
@@ -93,7 +93,7 @@ mod tests {
     fn debugger_outputs_values_on_given_port() {
         let port: PortIdentifier = "qq".to_owned();
         let value: PortValue = 1;
-        let debugger = Debugger::new(port.clone(), &vec![value]).unwrap();
+        let debugger = Sequencer::new(port.clone(), &vec![value]).unwrap();
         
         let result = debugger.get_port_value(&port);
         
@@ -106,7 +106,7 @@ mod tests {
     fn debugger_outputs_provided_values_in_order() {
         let port: PortIdentifier = "qq".to_owned();
         let values: Vec<PortValue> = vec![1, 2, 3];
-        let mut debugger = Debugger::new(port.clone(), &values).unwrap();
+        let mut debugger = Sequencer::new(port.clone(), &values).unwrap();
     
         for idx in 0..3 {
             let value = debugger.get_port_value(&port).unwrap();
@@ -119,7 +119,7 @@ mod tests {
     fn debugger_loops_when_end_of_values_reached() {
         let port: PortIdentifier = "qq".to_owned();
         let values: Vec<PortValue> = vec![1, 2, 3];
-        let mut debugger = Debugger::new(port.clone(), &values).unwrap();
+        let mut debugger = Sequencer::new(port.clone(), &values).unwrap();
     
         let expected: Vec<PortValue> = vec![1, 2, 3, 1, 2, 3, 1, 2, 3];
         for idx in 0..9 {
