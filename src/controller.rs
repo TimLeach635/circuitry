@@ -1,8 +1,9 @@
 use std::collections::HashMap;
+use std::iter::Chain;
 use crate::device::{Device, PortIdentifier, PortValue};
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::graph::{DiGraph, EdgeReference, Edges, NodeIndex};
 use petgraph::acyclic::{Acyclic};
-use petgraph::Direction;
+use petgraph::{Directed, Direction};
 
 pub type DeviceIdentifier = String;
 
@@ -73,6 +74,42 @@ impl Controller {
         // Add the device
         // Do this after the ports because it moves the device into the HashMap
         self.devices.insert(id, device);
+    }
+    
+    pub fn rename_device(&mut self, old_id: DeviceIdentifier, new_id: DeviceIdentifier)
+        -> Result<(), ControllerError>
+    {
+        if self.devices.contains_key(&new_id) {
+            // Shouldn't overwrite
+            return Err(ControllerError);
+        }
+        
+        match self.devices.remove(&old_id) {
+            None => Err(ControllerError),
+            Some(device) => {
+                self.devices.insert(new_id, device);
+                Ok(())
+            }
+        }
+    }
+    
+    /// Remove a device from this controller. Fails if the device has connections.
+    /// 
+    /// To remove a device and also all its connections, use
+    /// [`remove_device_with_cascade`].
+    /// 
+    /// [`remove_device_with_cascade`]: Controller::remove_device_with_cascade
+    pub fn remove_device(&mut self, id: DeviceIdentifier) 
+        -> Result<(), ControllerError>
+    {
+        
+    }
+
+    /// Remove a device from this controller, also removing all connections from or to it.
+    pub fn remove_device_with_cascade(&mut self, id: DeviceIdentifier)
+        -> Result<(), ControllerError>
+    {
+        
     }
 
     /// Attempt to add a connection between two ports known by this [`Controller`].
@@ -199,6 +236,35 @@ impl Controller {
                 // TODO: Rollback ticks so this can be done again
                 return Err(ControllerError);
             }
+        }
+
+        Ok(result)
+    }
+    
+    /// Get the edges of the graph that are connected to any port belonging to the given device.
+    /// 
+    /// Fails if the device isn't in this controller.
+    fn device_connections(&self, id: &DeviceIdentifier)
+        -> Result<Vec<EdgeReference<EdgeType>>, ControllerError>
+    {
+        let mut result = Vec::new();
+
+        let device = match self.devices.get(id) {
+            None => return Err(ControllerError),
+            Some(d) => d,
+        };
+        let mut port_ids: Vec<PortIdentifier> = Vec::new();
+        port_ids.extend(device.get_input_ports());
+        port_ids.extend(device.get_output_ports());
+        
+        let port_indices = port_ids
+            .iter()
+            .map(|port_id| *self.ports
+                .get(&(id.clone(), port_id.clone()))
+                .expect("Port id should have been added to self.ports when device was added")
+            );
+        for idx in port_indices {
+            result.extend(self.dependencies.edges(idx));
         }
 
         Ok(result)
