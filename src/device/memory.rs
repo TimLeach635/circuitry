@@ -116,8 +116,9 @@ impl Device for Memory {
             );
         }
         
-        // Only output port is "rv", and it's not known at the beginning of a tick, so the return
-        // is always empty
+        // Clear provided values
+        self.specified_this_tick = HashMap::new();
+        
         Ok(())
     }
 }
@@ -224,5 +225,22 @@ mod tests {
         let result = result.unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap(), value);
+    }
+    
+    #[test]
+    fn can_provide_port_values_again_after_tick() {
+        let address: PortValue = 2;
+        let value: PortValue = 3;
+        let mut memory = Memory::new();
+        let mut ports: HashMap<PortIdentifier, PortValue> = HashMap::new();
+        ports.insert("we".to_owned(), 1);
+        ports.insert("wa".to_owned(), address);
+        ports.insert("wv".to_owned(), value);
+
+        _ = memory.provide_port_values(ports.clone()).unwrap();
+        _ = memory.tick();
+        
+        let result = memory.provide_port_values(ports);
+        assert!(result.is_ok());
     }
 }

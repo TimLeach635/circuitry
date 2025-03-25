@@ -207,9 +207,11 @@ impl Controller {
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::Controller;
+    use crate::controller::{Controller, DeviceIdentifier};
+    use crate::device::debug::constant::Constant;
     use crate::device::debug::sequencer::Sequencer;
     use crate::device::memory::Memory;
+    use crate::device::{PortIdentifier, PortValue};
 
     #[test]
     fn controller_can_be_instantiated() {
@@ -220,23 +222,23 @@ mod tests {
     fn controller_can_have_devices_added_to_it() {
         let mut controller = Controller::new();
         let memory = Memory::new();
-        let debugger = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
+        let sequencer = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
         
         let _ = controller.add_device("Memory".to_owned(), Box::new(memory));
-        let _ = controller.add_device("Debugger".to_owned(), Box::new(debugger));
+        let _ = controller.add_device("Sequencer".to_owned(), Box::new(sequencer));
     }
     
     #[test]
     fn controller_can_have_connections_added_to_it() {
         let mut controller = Controller::new();
         let memory = Memory::new();
-        let debugger = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
+        let sequencer = Sequencer::new("qq".to_owned(), &vec![0]).unwrap();
 
         let _ = controller.add_device("Memory".to_owned(), Box::new(memory));
-        let _ = controller.add_device("Debugger".to_owned(), Box::new(debugger));
+        let _ = controller.add_device("Sequencer".to_owned(), Box::new(sequencer));
         
         let result = controller.add_connection(
-            &"Debugger".to_owned(), &"qq".to_owned(),
+            &"Sequencer".to_owned(), &"qq".to_owned(),
             &"Memory".to_owned(), &"ra".to_owned(),
         );
         
@@ -248,7 +250,7 @@ mod tests {
         let mut controller = Controller::new();
         let memory = Memory::new();
 
-        let _ = controller.add_device("Memory".to_owned(), Box::new(memory));
+        _ = controller.add_device("Memory".to_owned(), Box::new(memory));
 
         let result = controller.add_connection(
             &"Memory".to_owned(), &"rv".to_owned(),
@@ -256,5 +258,134 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+    
+    #[test]
+    fn controller_can_perform_tick_with_no_devices() {
+        let mut controller = Controller::new();
+        let result = controller.tick();
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn controller_can_perform_tick_with_device_with_only_outputs() {
+        let mut controller = Controller::new();
+        let constant = Constant::new("qq".to_owned(), 1);
+
+        _ = controller.add_device("Constant".to_owned(), Box::new(constant));
+        
+        let result = controller.tick();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn controller_gets_output_values_on_tick() {
+        let mut controller = Controller::new();
+        let device_id: DeviceIdentifier = "Constant".to_owned();
+        let port_id: PortIdentifier = "qq".to_owned();
+        let value: PortValue = 1;
+        let constant = Constant::new(port_id.clone(), value);
+
+        _ = controller.add_device(device_id.clone(), Box::new(constant));
+
+        let result = controller.tick().unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result.contains_key(&(device_id.clone(), port_id.clone())));
+        assert_eq!(result.get(&(device_id.clone(), port_id.clone())), Some(&value));
+    }
+    
+    #[test]
+    fn controller_cannot_tick_with_unconnected_inputs() {
+        let mut controller = Controller::new();
+        let memory = Memory::new();
+
+        _ = controller.add_device("Memory".to_owned(), Box::new(memory));
+
+        let result = controller.tick();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn controller_can_tick_with_connected_inputs() {
+        let mut controller = Controller::new();
+        let memory = Memory::new();
+        let ra_const = Constant::new("qq".to_owned(), 1);
+        let we_const = Constant::new("qq".to_owned(), 1);
+        let wa_const = Constant::new("qq".to_owned(), 2);
+        let wv_const = Constant::new("qq".to_owned(), 3);
+
+        // Add devices
+        _ = controller.add_device("Memory".to_owned(), Box::new(memory));
+        _ = controller.add_device("RA constant".to_owned(), Box::new(ra_const));
+        _ = controller.add_device("WE constant".to_owned(), Box::new(we_const));
+        _ = controller.add_device("WA constant".to_owned(), Box::new(wa_const));
+        _ = controller.add_device("WV constant".to_owned(), Box::new(wv_const));
+        
+        // Add connections
+        _ = controller.add_connection(
+            &"RA constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"ra".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WE constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"we".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WA constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"wa".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WV constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"wv".to_owned(),
+        ).unwrap();
+
+        let result = controller.tick();
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn controller_passes_values_and_performs_ticks_on_devices() {
+        let mut controller = Controller::new();
+        let memory = Memory::new();
+        let ra_const = Constant::new("qq".to_owned(), 1);
+        let we_const = Constant::new("qq".to_owned(), 1);
+        let wa_const = Constant::new("qq".to_owned(), 1);
+        let written_value: PortValue = 5;
+        let wv_const = Constant::new("qq".to_owned(), written_value);
+
+        // Add devices
+        _ = controller.add_device("Memory".to_owned(), Box::new(memory));
+        _ = controller.add_device("RA constant".to_owned(), Box::new(ra_const));
+        _ = controller.add_device("WE constant".to_owned(), Box::new(we_const));
+        _ = controller.add_device("WA constant".to_owned(), Box::new(wa_const));
+        _ = controller.add_device("WV constant".to_owned(), Box::new(wv_const));
+
+        // Add connections
+        _ = controller.add_connection(
+            &"RA constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"ra".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WE constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"we".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WA constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"wa".to_owned(),
+        ).unwrap();
+        _ = controller.add_connection(
+            &"WV constant".to_owned(), &"qq".to_owned(),
+            &"Memory".to_owned(), &"wv".to_owned(),
+        ).unwrap();
+        
+        // After the first tick, memory reads 0 because it hasn't been written to yet
+        let result = controller.tick().unwrap();
+        assert!(result.contains_key(&("Memory".to_owned(), "rv".to_owned())));
+        assert_eq!(result.get(&("Memory".to_owned(), "rv".to_owned())), Some(&0));
+        
+        // After the second tick, it should read 1 because we have written that value to it
+        let result = controller.tick().unwrap();
+        assert!(result.contains_key(&("Memory".to_owned(), "rv".to_owned())));
+        assert_eq!(result.get(&("Memory".to_owned(), "rv".to_owned())), Some(&written_value));
     }
 }
