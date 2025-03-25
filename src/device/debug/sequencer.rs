@@ -42,12 +42,11 @@ impl Device for Sequencer {
         Ok(HashSet::new())
     }
 
-    fn provide_port_value(&mut self, port: PortIdentifier, value: PortValue)
+    fn provide_port_value(&mut self, _: PortIdentifier, _: PortValue)
         -> Result<(), DeviceError>
     {
-        let mut values = HashMap::new();
-        values.insert(port, value);
-        self.provide_port_values(values)
+        // No input ports, so this operation always fails
+        Err(DeviceError)
     }
 
     fn provide_port_values(&mut self, _: HashMap<PortIdentifier, PortValue>)
@@ -78,24 +77,24 @@ mod tests {
     use crate::device::{Device, PortIdentifier, PortValue};
 
     #[test]
-    fn debugger_cannot_be_instantiated_if_no_values_given() {
+    fn sequencer_cannot_be_instantiated_if_no_values_given() {
         let result = Sequencer::new("qq".to_owned(), &vec![]);
         assert!(result.is_err());
     }
     
     #[test]
-    fn debugger_can_be_instantiated() {
+    fn sequencer_can_be_instantiated() {
         let result = Sequencer::new("qq".to_owned(), &vec![0]);
         assert!(result.is_ok());
     }
     
     #[test]
-    fn debugger_outputs_values_on_given_port() {
+    fn sequencer_outputs_values_on_given_port() {
         let port: PortIdentifier = "qq".to_owned();
         let value: PortValue = 1;
-        let debugger = Sequencer::new(port.clone(), &vec![value]).unwrap();
+        let sequencer = Sequencer::new(port.clone(), &vec![value]).unwrap();
         
-        let result = debugger.get_port_value(&port);
+        let result = sequencer.get_port_value(&port);
         
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -103,29 +102,29 @@ mod tests {
     }
     
     #[test]
-    fn debugger_outputs_provided_values_in_order() {
+    fn sequencer_outputs_provided_values_in_order() {
         let port: PortIdentifier = "qq".to_owned();
         let values: Vec<PortValue> = vec![1, 2, 3];
-        let mut debugger = Sequencer::new(port.clone(), &values).unwrap();
+        let mut sequencer = Sequencer::new(port.clone(), &values).unwrap();
     
         for idx in 0..3 {
-            let value = debugger.get_port_value(&port).unwrap();
+            let value = sequencer.get_port_value(&port).unwrap();
             assert_eq!(value, Some(values[idx]));
-            let _ = debugger.tick().unwrap();
+            let _ = sequencer.tick().unwrap();
         }
     }
     
     #[test]
-    fn debugger_loops_when_end_of_values_reached() {
+    fn sequencer_loops_when_end_of_values_reached() {
         let port: PortIdentifier = "qq".to_owned();
         let values: Vec<PortValue> = vec![1, 2, 3];
-        let mut debugger = Sequencer::new(port.clone(), &values).unwrap();
+        let mut sequencer = Sequencer::new(port.clone(), &values).unwrap();
     
         let expected: Vec<PortValue> = vec![1, 2, 3, 1, 2, 3, 1, 2, 3];
         for idx in 0..9 {
-            let value = debugger.get_port_value(&port).unwrap();
+            let value = sequencer.get_port_value(&port).unwrap();
             assert_eq!(value, Some(expected[idx]));
-            let _ = debugger.tick().unwrap();
+            let _ = sequencer.tick().unwrap();
         }
     }
 }
