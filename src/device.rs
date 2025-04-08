@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 pub mod memory;
 pub mod debug;
+mod cpu;
 
 pub type PortIdentifier = String;
 pub type PortValue = u32;
